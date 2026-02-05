@@ -1,0 +1,481 @@
+<!doctype html>
+
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Happiness & Cost-Effectiveness Model — happiness.html</title>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg:#0b0f12;
+      --panel:#0f1720;
+      --muted:#9aa6b2;
+      --accent:#7dd3fc; /* cyan-ish */
+      --glass: rgba(255,255,255,0.03);
+      --card-shadow: 0 6px 18px rgba(0,0,0,0.6);
+      --radius:14px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:linear-gradient(180deg,var(--bg),#050607 140%);
+      color:#e6eef6;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      padding:28px;
+    }.app{
+  max-width:1150px;
+  margin:0 auto;
+  display:grid;
+  grid-template-columns: 420px 1fr;
+  gap:20px;
+  align-items:start;
+}
+.card{
+  background:linear-gradient(180deg,var(--panel), rgba(20,25,30,0.9));
+  border-radius:var(--radius);
+  padding:18px;
+  box-shadow:var(--card-shadow);
+  border:1px solid rgba(255,255,255,0.03);
+}
+
+h1{font-size:20px;margin:0 0 8px 0}
+p.lead{color:var(--muted);margin:0 0 14px 0;font-size:13px}
+
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+.field{margin-bottom:12px}
+input[type="number"], select, .range{
+  width:100%;
+  background:transparent;
+  border:1px solid rgba(255,255,255,0.06);
+  padding:10px 12px;border-radius:10px;color:inherit;font-size:15px;
+}
+.row{display:flex;gap:10px}
+.row > *{flex:1}
+.small{font-size:12px;color:var(--muted)}
+
+.slider{appearance:none;height:6px;border-radius:6px;background:linear-gradient(90deg,#1f2937,#0ea5a4);outline:none}
+.out{background:transparent;border:0;color:var(--muted);font-size:13px}
+
+.big-number{font-weight:700;font-size:26px}
+.muted{color:var(--muted);font-size:13px}
+
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+button{
+  background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 12px;border-radius:10px;color:inherit;cursor:pointer;font-weight:600
+}
+button.primary{background:linear-gradient(90deg,#0369a1,#0891b2);border:0}
+button.ghost{background:transparent;border:1px dashed rgba(255,255,255,0.04)}
+
+.chart-wrap{padding:12px}
+
+/* responsive */
+@media (max-width:980px){
+  .app{grid-template-columns:1fr;padding-bottom:60px}
+}
+
+footer{margin-top:18px;color:var(--muted);font-size:12px}
+
+/* compact table */
+table{width:100%;border-collapse:collapse;margin-top:8px}
+td,th{padding:8px;border-bottom:1px dashed rgba(255,255,255,0.03);text-align:left}
+th{color:var(--muted);font-size:13px}
+
+.chip{display:inline-block;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02);font-size:13px}
+
+.warning{color:#ffb86b;font-weight:700}
+
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- left: controls -->
+    <div class="card">
+      <h1>総幸福量 & 費用対効果モデル</h1>
+      <p class="lead">完全ダークモード — 入力して H (総幸福量) と Q (費用対効果) を自動計算。グラフ、プリセット、CSVエクスポート、ローカル保存対応。</p><div id="inputs">
+    <div class="field">
+      <label>M：動機の質 (0.1 - 2)</label>
+      <input id="M" type="number" step="0.01" min="0.1" max="2" value="1.2" />
+    </div>
+
+    <div class="field">
+      <label>T：持続期間（数値 + 単位）</label>
+      <div class="row">
+        <input id="Tval" type="number" min="0" step="1" value="30">
+        <select id="Tunit">
+          <option value="day">日</option>
+          <option value="week">週</option>
+          <option value="month" selected>月</option>
+          <option value="year">年</option>
+        </select>
+      </div>
+      <div class="small">月換算： <span id="Tmonths" class="chip">1.00 月</span></div>
+    </div>
+
+    <div class="field">
+      <label>E：経験効用 (1 - 10)</label>
+      <input id="E" type="number" min="1" max="10" step="0.1" value="6.5">
+    </div>
+
+    <div class="field">
+      <label>P：ピーク強度 (1 - 10)</label>
+      <input id="P" type="number" min="1" max="10" step="0.1" value="7">
+    </div>
+
+    <div class="field">
+      <label>V：価値観統合度</label>
+      <select id="V">
+        <option value="0.1">0.1</option>
+        <option value="0.5">0.5</option>
+        <option value="1" selected>1</option>
+      </select>
+    </div>
+
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03);margin:12px 0">
+
+    <div class="field">
+      <label>月のお小遣い収入 (円) — (自動で k を計算)</label>
+      <input id="allowance" type="number" min="0" step="100" value="10000">
+      <div class="small">C0 = お小遣い × 1/10</div>
+    </div>
+
+    <div class="field">
+      <label>C：費用 (円)</label>
+      <input id="C" type="number" min="0" step="100" value="5000">
+    </div>
+
+    <div class="field">
+      <label>計算・表示</label>
+      <div class="row">
+        <button id="calc" class="primary">今すぐ計算</button>
+        <button id="presetSave">プリセット保存</button>
+      </div>
+      <div class="controls">
+        <button id="downloadCsv">CSVエクスポート</button>
+        <button id="copyJson">結果をコピー</button>
+        <button id="reset">リセット</button>
+      </div>
+    </div>
+  </div>
+
+  <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03);margin:12px 0">
+
+  <div>
+    <h3>リアルタイム結果</h3>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div class="card" style="padding:12px;min-width:160px;flex:1">
+        <div class="muted">総幸福量 H</div>
+        <div id="Hout" class="big-number">—</div>
+        <div class="small">内訳: 予期・経験・想起</div>
+      </div>
+
+      <div class="card" style="padding:12px;min-width:160px;flex:1">
+        <div class="muted">費用対効果 Q</div>
+        <div id="Qout" class="big-number">—</div>
+        <div class="small">k（感覚スケール）: <span id="kout">—</span></div>
+      </div>
+    </div>
+
+    <div style="margin-top:10px">
+      <table>
+        <thead><tr><th>項目</th><th>値</th></tr></thead>
+        <tbody>
+          <tr><td>予期的効用 M×√T</td><td id="anticipation">-</td></tr>
+          <tr><td>経験効用 M×E</td><td id="experience">-</td></tr>
+          <tr><td>想起効用 P×V</td><td id="recollection">-</td></tr>
+          <tr><td>C0（基準コスト）</td><td id="C0out">-</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>作成: 自動生成HTML — 追加機能が欲しかったら教えてください！</footer>
+</div>
+
+<!-- right: charts & analysis -->
+<div>
+  <div class="card">
+    <h1>可視化・感度分析</h1>
+    <p class="lead">インタラクティブなグラフで費用を変えたときの Q の推移や、H を構成する各要素の割合を確認できます。</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="chart-wrap card">
+        <div class="muted">H の内訳</div>
+        <canvas id="breakdownChart" height="220"></canvas>
+      </div>
+
+      <div class="chart-wrap card">
+        <div class="muted">C を変化させた時の Q</div>
+        <canvas id="sensitivityChart" height="220"></canvas>
+      </div>
+    </div>
+
+    <div style="margin-top:12px" class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div class="muted">プリセット</div>
+          <div class="small">よく使う設定を保存／適用できます（ローカル保存）</div>
+        </div>
+        <div>
+          <select id="presets"></select>
+          <button id="applyPreset">適用</button>
+          <button id="deletePreset">削除</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <h1>操作ヘルプ</h1>
+    <p class="lead">主要機能は次の通り。</p>
+    <ul class="small">
+      <li>期間Tは自動で月換算されます（例: 1日=1/30月, 1週=1/4月, 1年=12月）</li>
+      <li>お小遣いから C0 を計算し、k = 2 / C0^0.3 を算出します。</li>
+      <li>CSVエクスポートで結果の履歴をダウンロードできます。</li>
+      <li>プリセットはブラウザローカルに保存されます（消さないでね）</li>
+    </ul>
+
+  </div>
+</div>
+
+  </div><script>
+// Utilities
+function toMonths(value, unit){
+  value = Number(value);
+  if(isNaN(value) || value<0) return 0;
+  switch(unit){
+    case 'day': return value/30;
+    case 'week': return value/4;
+    case 'month': return value;
+    case 'year': return value*12;
+    default: return value;
+  }
+}
+
+function round(v, d=2){ return Math.round(v*Math.pow(10,d))/Math.pow(10,d); }
+
+// DOM refs
+const M = document.getElementById('M');
+const Tval = document.getElementById('Tval');
+const Tunit = document.getElementById('Tunit');
+const E = document.getElementById('E');
+const P = document.getElementById('P');
+const V = document.getElementById('V');
+const allowance = document.getElementById('allowance');
+const C = document.getElementById('C');
+const calcBtn = document.getElementById('calc');
+const Hout = document.getElementById('Hout');
+const Qout = document.getElementById('Qout');
+const kout = document.getElementById('kout');
+const anticipation = document.getElementById('anticipation');
+const experience = document.getElementById('experience');
+const recollection = document.getElementById('recollection');
+const C0out = document.getElementById('C0out');
+const Tmonths = document.getElementById('Tmonths');
+const downloadCsv = document.getElementById('downloadCsv');
+const copyJson = document.getElementById('copyJson');
+const resetBtn = document.getElementById('reset');
+const presetSave = document.getElementById('presetSave');
+const presetsSelect = document.getElementById('presets');
+const applyPreset = document.getElementById('applyPreset');
+const deletePreset = document.getElementById('deletePreset');
+
+// Charts
+let breakdownChart, sensitivityChart;
+function initCharts(){
+  const bctx = document.getElementById('breakdownChart').getContext('2d');
+  breakdownChart = new Chart(bctx,{
+    type:'doughnut',
+    data:{labels:['予期的効用','経験効用','想起効用'],datasets:[{data:[1,1,1],backgroundColor:['rgba(125,211,252,0.9)','rgba(99,102,241,0.9)','rgba(34,197,94,0.9)'],borderWidth:0}]},
+    options:{plugins:{legend:{labels:{color:'rgba(230,238,246,0.9)'}}}}
+  });
+
+  const sctx = document.getElementById('sensitivityChart').getContext('2d');
+  sensitivityChart = new Chart(sctx,{
+    type:'line',
+    data:{labels:[],datasets:[{label:'Q',data:[],tension:0.3,pointRadius:2}]},
+    options:{scales:{x:{title:{display:true,text:'費用 (円)'},ticks:{color:'rgba(230,238,246,0.85)'}},y:{title:{display:true,text:'Q'},ticks:{color:'rgba(230,238,246,0.85)'}}},plugins:{legend:{display:false}}}
+  });
+}
+
+// Core model
+function computeAll(){
+  const m = Number(M.value) || 0;
+  const tval = Number(Tval.value) || 0;
+  const tunit = Tunit.value;
+  const t_months = toMonths(tval,tunit);
+  const e = Number(E.value) || 0;
+  const p = Number(P.value) || 0;
+  const v = Number(V.value) || 0.1;
+  const allowanceVal = Number(allowance.value) || 0;
+  const c = Number(C.value) || 0;
+
+  // anticipate
+  const anticipationVal = m * Math.sqrt(Math.max(0,t_months));
+  const experienceVal = m * e;
+  const recollectionVal = p * v;
+  const H = anticipationVal + experienceVal + recollectionVal;
+
+  // k calculation
+  const C0 = allowanceVal/10; // as spec
+  let k;
+  if(C0>0){ k = 2 / Math.pow(C0,0.3); }
+  else { k = Infinity; }
+
+  // Q
+  let Q;
+  if(!isFinite(k) || c<=0){ Q = 0; }
+  else { Q = H / (k * Math.pow(c,0.3)); }
+
+  // update UI
+  Hout.textContent = round(H,3);
+  Qout.textContent = isFinite(Q)? round(Q,4) : '—';
+  kout.textContent = isFinite(k)? round(k,4) : '—';
+  anticipation.textContent = round(anticipationVal,4);
+  experience.textContent = round(experienceVal,4);
+  recollection.textContent = round(recollectionVal,4);
+  C0out.textContent = isFinite(C0)? Math.round(C0) + ' 円' : '—';
+  Tmonths.textContent = round(t_months,3) + ' 月';
+
+  // charts
+  try{
+    breakdownChart.data.datasets[0].data = [anticipationVal, experienceVal, recollectionVal];
+    breakdownChart.update();
+
+    // sensitivity: sweep C from small to large
+    const points = [];
+    const labels = [];
+    const minC = Math.max(1, Math.round(c*0.1));
+    const maxC = Math.max(minC+1, Math.round(c*5));
+    const steps = 40;
+    for(let i=0;i<=steps;i++){
+      const Ci = Math.round(minC + (maxC-minC)*(i/steps));
+      let Qi = 0;
+      if(Ci>0 && isFinite(k)) Qi = H / (k * Math.pow(Ci,0.3));
+      points.push(round(Qi,4));
+      labels.push(Ci);
+    }
+    sensitivityChart.data.labels = labels;
+    sensitivityChart.data.datasets[0].data = points;
+    sensitivityChart.update();
+  }catch(e){console.warn(e)}
+
+  return {H,Q,k,C0,anticipationVal,experienceVal,recollectionVal,t_months};
+}
+
+// interactions
+calcBtn.addEventListener('click',()=>{ computeAll(); saveLastResult(); });
+[ M,Tval,Tunit,E,P,V,allowance,C ].forEach(el=>el.addEventListener('input',()=>{ computeAll(); }));
+
+// CSV export
+function downloadCSV(rows, filename='happiness_results.csv'){
+  const header = Object.keys(rows[0]).join(',') + '\n';
+  const body = rows.map(r=>Object.values(r).join(',')).join('\n');
+  const blob = new Blob([header + body],{type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
+}
+
+let history = [];
+function saveLastResult(){
+  const now = new Date().toISOString();
+  const res = computeAll();
+  const row = {
+    time:now,
+    M:Number(M.value),
+    Tval:Number(Tval.value),
+    Tunit:Tunit.value,
+    Tmonths:res.t_months,
+    E:Number(E.value),
+    P:Number(P.value),
+    V:Number(V.value),
+    allowance:Number(allowance.value),
+    C:Number(C.value),
+    C0:res.C0,
+    k:res.k,
+    H:res.H,
+    Q:res.Q
+  };
+  history.push(row);
+  // keep last 100
+  if(history.length>100) history.shift();
+}
+
+downloadCsv.addEventListener('click',()=>{
+  if(history.length===0) saveLastResult();
+  if(history.length===0) return alert('データがありません。まず計算して保存してください。');
+  downloadCSV(history,'happiness_history.csv');
+});
+
+copyJson.addEventListener('click',async ()=>{
+  saveLastResult();
+  try{
+    await navigator.clipboard.writeText(JSON.stringify(history[history.length-1], null, 2));
+    alert('最新結果をコピーしました。');
+  }catch(e){ alert('クリップボードにコピーできませんでした。'); }
+});
+
+resetBtn.addEventListener('click',()=>{
+  if(!confirm('リセットしますか？（プリセットや履歴は消えません）')) return;
+  M.value=1.2;Tval.value=30;Tunit.value='month';E.value=6.5;P.value=7;V.value=1;allowance.value=10000;C.value=5000;history=[];computeAll();
+});
+
+// Presets (localStorage)
+function loadPresets(){
+  const raw = localStorage.getItem('happiness_presets');
+  let pres = raw? JSON.parse(raw):[];
+  presetsSelect.innerHTML = '<option value="">— 選択 —</option>' + pres.map((p,i)=>`<option value="${i}">${p.name}</option>`).join('');
+  return pres;
+}
+function savePresets(pres){ localStorage.setItem('happiness_presets', JSON.stringify(pres)); }
+
+presetSave.addEventListener('click',()=>{
+  const name = prompt('プリセット名を入力');
+  if(!name) return;
+  const pres = loadPresets();
+  pres.push({name, M:+M.value, Tval:+Tval.value, Tunit:Tunit.value, E:+E.value, P:+P.value, V:+V.value, allowance:+allowance.value, C:+C.value});
+  savePresets(pres); loadPresets(); alert('プリセットを保存しました');
+});
+
+applyPreset.addEventListener('click',()=>{
+  const idx = presetsSelect.value;
+  if(idx==='') return alert('プリセットを選んでください');
+  const pres = loadPresets();
+  const p = pres[Number(idx)];
+  if(!p) return alert('プリセットが見つかりません');
+  M.value=p.M;Tval.value=p.Tval;Tunit.value=p.Tunit;E.value=p.E;P.value=p.P;V.value=p.V;allowance.value=p.allowance;C.value=p.C;computeAll();
+});
+
+deletePreset.addEventListener('click',()=>{
+  const idx = presetsSelect.value;
+  if(idx==='') return alert('削除するプリセットを選んでください');
+  const pres = loadPresets();
+  pres.splice(idx,1); savePresets(pres); loadPresets(); alert('削除しました');
+});
+
+// persist last inputs
+function persistInputs(){
+  const data = { M:M.value, Tval:Tval.value, Tunit:Tunit.value, E:E.value, P:P.value, V:V.value, allowance:allowance.value, C:C.value };
+  localStorage.setItem('happiness_inputs', JSON.stringify(data));
+}
+function restoreInputs(){
+  const raw = localStorage.getItem('happiness_inputs');
+  if(!raw) return;
+  try{ const d = JSON.parse(raw); Object.keys(d).forEach(k=>{ if(document.getElementById(k)) document.getElementById(k).value = d[k]; }); }catch(e){}
+}
+
+[ M,Tval,Tunit,E,P,V,allowance,C ].forEach(el=>el.addEventListener('input',persistInputs));
+
+// initialise
+initCharts(); restoreInputs(); loadPresets(); computeAll();
+
+// save result periodically to history (nice-to-have behaviour)
+setInterval(()=>{ saveLastResult(); }, 1000*60);
+
+</script></body>
+</html>
