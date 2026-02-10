@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ハピネスｰ幸福予測分析</title>
+<style>
+  body { background-color: #121212; color: #fff; font-family: sans-serif; margin: 0; padding: 10px; }
+  h1 { text-align: center; margin-bottom: 20px; }
+  .input-group { margin-bottom: 15px; display: flex; flex-direction: column; }
+  label { margin-bottom: 5px; }
+  input[type="number"], select, textarea { background-color: #222; color: #fff; border: 1px solid #fff; border-radius: 5px; padding: 8px; font-size: 16px; }
+  input[type="range"] { width: 100%; }
+  .button { background-color: #00bfff; color: #fff; border: none; padding: 12px; border-radius: 8px; font-size: 16px; margin-top: 10px; width: 100%; cursor: pointer; }
+  .results { margin-top: 20px; }
+  canvas { background-color: #222; border-radius: 8px; }
+  .history { margin-top: 20px; }
+  .history-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-weight: bold; }
+  .history-item span { flex: 1; }
+  .history-item button { margin-left: 5px; background-color: #00bfff; color: #fff; border: none; border-radius: 4px; padding: 2px 6px; font-size: 12px; cursor: pointer; }
+  .history-item button.delete { background-color: red; }
+  .center-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    color: #ccc;
+    margin-bottom: 5px;
+  }
+  .center-label .middle-text {
+    font-weight: bold;
+    color: #fff;
+    text-align: center;
+    flex: 1;
+  }
+  .center-label span:first-child,
+  .center-label span:last-child {
+    width: 80px;
+    text-align: center;
+  }
+
+  /* 🔸 追加：ロック中のスライダー視覚表現 */
+  input[type="range"]:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+/* 追加・変更：編集ボタン専用デザイン */
+#toggleAll {
+  background-color: #00bfff;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 14px;
+  width: auto;
+  cursor: pointer;
+  margin: 10px auto 15px auto;  /* ← これが中央寄せのポイント！ */
+  display: block;               /* margin:auto が効くように */
+}
+#toggleAll:hover {
+  opacity: 0.85;
+}
+</style>
+</head>
+<body>
+
+<h1>ハピネスｰ幸福予測分析</h1>
+
+<div class="input-group">
+  <label for="T">持続期間 (T)</label>
+  <div style="display:flex; gap:10px;">
+    <input type="number" id="T" placeholder="数字" min="0" step="1">
+    <select id="TUnit">
+      <option value="day">日</option>
+      <option value="week">週</option>
+      <option value="month" selected>月</option>
+      <option value="year">年</option>
+    </select>
+  </div>
+</div>
+
+<!-- 🔸 全スライダー共通 編集ボタン -->
+<div style="display: flex; justify-content: flex-end;">
+  <button id="toggleAll" onclick="toggleAllSliders()">編集モードをONにする</button>
+</div>
+
+<!-- 動機の質 (M) -->
+<div class="input-group">
+  <div class="center-label">
+    <span>外的 ←</span>
+    <span class="middle-text">動機の質 (M)</span>
+    <span>→ 内発的</span>
+  </div>
+  <input type="range" id="M" min="0.1" max="2" step="0.1" value="1" disabled>
+  <span id="MValue">1</span>
+</div>
+
+<!-- 体験全体の平均の満足度 (E) -->
+<div class="input-group">
+  <div class="center-label">
+    <span>低い ←</span>
+    <span class="middle-text">体験全体の平均の満足度 (E)</span>
+    <span>→ 高い</span>
+  </div>
+  <input type="range" id="E" min="1" max="10" step="1" value="5" disabled>
+  <span id="EValue">5</span>
+</div>
+
+<!-- 最大の幸福感の強度 (P) -->
+<div class="input-group">
+  <div class="center-label">
+    <span>弱い ←</span>
+    <span class="middle-text">最大の幸福感の強度 (P)</span>
+    <span>→ 強い</span>
+  </div>
+  <input type="range" id="P" min="1" max="10" step="1" value="5" disabled>
+  <span id="PValue">5</span>
+</div>
+
+<!-- 自身との価値観合致度 (V) -->
+<div class="input-group">
+  <div class="center-label">
+    <span>低い ←</span>
+    <span class="middle-text">自身との価値観合致度 (V)</span>
+    <span>→ 高い</span>
+  </div>
+  <input type="range" id="V" min="0.1" max="1" step="0.1" value="0.5" disabled>
+  <span id="VValue">0.5</span>
+</div>
+
+<div class="input-group">
+  <label for="Cost">費用 (C 円)</label>
+  <input type="number" id="Cost" placeholder="例: 5000">
+</div>
+
+<div class="input-group">
+  <label for="Allowance">月のお小遣い金額 (円)</label>
+  <input type="number" id="Allowance" placeholder="例: 20000">
+</div>
+
+<div class="input-group">
+  <label for="kValue">金銭感覚 k (任意、空欄で自動計算)</label>
+  <input type="number" id="kValue" placeholder="例: 1.5" step="0.01">
+</div>
+
+<button class="button" onclick="calculate()">計算する</button>
+<button class="button" onclick="saveHistoryButton()">履歴を保存</button>
+
+<div class="results">
+  <canvas id="barChart" width="400" height="200"></canvas>
+  <p>総幸福量 H: <span id="HResult">-</span></p>
+  <p>費用対効果 Q: <span id="QResult">-</span></p>
+  <p id="QJudgement">-</p>
+</div>
+
+<div class="input-group">
+  <label for="memo">メモ</label>
+  <textarea id="memo" rows="2" placeholder="メモを入力"></textarea>
+</div>
+
+<div class="history">
+  <h3>履歴</h3>
+  <div id="historyList"></div>
+  <button class="button" onclick="exportCSV()">CSV出力</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const MSlider = document.getElementById("M");
+const ESlider = document.getElementById("E");
+const PSlider = document.getElementById("P");
+const VSlider = document.getElementById("V");
+VSlider.oninput = () => { document.getElementById("VValue").innerText = VSlider.value; };
+const AllowanceInput = document.getElementById("Allowance");
+const kInputField = document.getElementById("kValue");
+
+// スライダー値を表示
+MSlider.oninput = () => { document.getElementById("MValue").innerText = MSlider.value; }
+ESlider.oninput = () => { document.getElementById("EValue").innerText = ESlider.value; }
+PSlider.oninput = () => { document.getElementById("PValue").innerText = PSlider.value; }
+
+// 月のお小遣い入力時に k をリアルタイムで自動計算
+AllowanceInput.addEventListener("input", () => {
+  const allowance = parseFloat(AllowanceInput.value);
+  if (!isNaN(allowance) && allowance > 0) {
+    const autoK = 10 / Math.pow(allowance / 20, 0.31);
+    kInputField.value = autoK.toFixed(2);
+  } else {
+    kInputField.value = "";
+  }
+});
+
+let chart;
+
+// 🔸 追加：全スライダーを一括で制御する関数
+let slidersLocked = true;
+function toggleAllSliders() {
+  const sliders = ['M', 'E', 'P', 'V'].map(id => document.getElementById(id));
+  const btn = document.getElementById("toggleAll");
+  slidersLocked = !slidersLocked;
+  sliders.forEach(slider => slider.disabled = slidersLocked);
+  if (slidersLocked) {
+    btn.textContent = "編集モードをONにする";
+    btn.style.backgroundColor = "#00bfff";
+  } else {
+    btn.textContent = "編集モードをOFFにする";
+    btn.style.backgroundColor = "orange";
+  }
+}
+
+// ------------------- 完全版 calculate() -------------------
+function calculate() {
+  let T = parseFloat(document.getElementById("T").value) || 0;
+  let unit = document.getElementById("TUnit").value;
+  let M = parseFloat(MSlider.value);
+  let E = parseFloat(ESlider.value);
+  let P = parseFloat(PSlider.value);
+  let V = parseFloat(document.getElementById("V").value);
+  let Allowance = parseFloat(AllowanceInput.value);
+  let C = parseFloat(document.getElementById("Cost").value);
+  let kInput = parseFloat(kInputField.value);
+
+  if(unit === "day") T = T/30;
+  else if(unit === "week") T = T/4.345;
+  else if(unit === "year") T = T*12;
+
+  let C0 = Allowance/20;
+  let k = !isNaN(kInput) ? kInput : 10 / Math.pow(C0, 0.31);
+
+  if(!C) C = C0;
+
+  let H = M*(Math.sqrt(T)+E)+P*V;
+  let Q = (5*H)/(k*Math.pow(C, 0.31));
+
+  let QRounded = parseFloat(Q.toFixed(2));
+  let judgement = "";
+  if(QRounded > 1) judgement = "良い";
+  else if(QRounded === 1) judgement = "均衡";
+  else judgement = "保留";
+
+  document.getElementById("HResult").innerText = H.toFixed(2);
+  document.getElementById("QResult").innerText = QRounded.toFixed(2);
+  let judgementElem = document.getElementById("QJudgement");
+  judgementElem.innerText = judgement;
+  judgementElem.style.color = judgement === "良い" ? "lightgreen" : judgement === "均衡" ? "white" : "red";
+
+  drawGraph(M, E, P, V, T);
+}
+
+function drawGraph(M, E, P, V, T) {
+  const ctx = document.getElementById('barChart').getContext('2d');
+  const data = {
+    labels: ['待機幸福','経験幸福','想起幸福'],
+    datasets: [{
+      label: '効用',
+      data: [M*Math.sqrt(T), M*E, P*V],
+      backgroundColor: ['#ff6666','#66ff66','#6666ff']
+    }]
+  };
+  const config = { type:'bar', data, options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}};
+  if(chart) chart.destroy();
+  chart = new Chart(ctx, config);
+}
+
+function saveHistoryButton() {
+  const T = parseFloat(document.getElementById("T").value) || 0;
+  const TUnit = document.getElementById("TUnit").value;
+  const M = parseFloat(MSlider.value);
+  const E = parseFloat(ESlider.value);
+  const P = parseFloat(PSlider.value);
+  const V = parseFloat(document.getElementById("V").value);
+  const Allowance = parseFloat(AllowanceInput.value);
+  const C = parseFloat(document.getElementById("Cost").value);
+  const k = parseFloat(kInputField.value);
+  const H = parseFloat(document.getElementById("HResult").innerText);
+  const Q = parseFloat(document.getElementById("QResult").innerText);
+  const judgement = document.getElementById("QJudgement").innerText;
+  const memo = document.getElementById("memo").value;
+
+  if(isNaN(H) || isNaN(Q) || judgement === "-") {
+    alert("まず計算をしてください。");
+    return;
+  }
+
+  const date = new Date().toLocaleString();
+  let history = JSON.parse(localStorage.getItem("happinessHistory")||"[]");
+  history.push({date,memo,T,TUnit,M,E,P,V,Allowance,C,k,H,Q,judgement});
+  localStorage.setItem("happinessHistory",JSON.stringify(history));
+  loadHistory();
+  alert("履歴を保存しました！");
+}
+
+function loadHistory() {
+  const list = document.getElementById("historyList");
+  list.innerHTML = "";
+  let history = JSON.parse(localStorage.getItem("happinessHistory")||"[]");
+
+  history.forEach((item,index)=>{
+    const div = document.createElement("div");
+    div.className = "history-item";
+
+    const span = document.createElement("span");
+    span.textContent = `${item.date}: ${item.memo}`;
+    div.appendChild(span);
+
+    const loadBtn = document.createElement("button");
+    loadBtn.textContent = "読み込む";
+    loadBtn.addEventListener("click", (e) => { e.stopPropagation(); loadToInput(item); });
+    div.appendChild(loadBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "削除";
+    delBtn.className = "delete";
+    delBtn.addEventListener("click", (e) => deleteHistory(e, index));
+    div.appendChild(delBtn);
+
+    list.appendChild(div);
+  });
+}
+
+function deleteHistory(e, index) {
+  e.stopPropagation();
+  let history = JSON.parse(localStorage.getItem("happinessHistory")||"[]");
+  history.splice(index,1);
+  localStorage.setItem("happinessHistory",JSON.stringify(history));
+  loadHistory();
+}
+
+function loadToInput(item) {
+  document.getElementById("T").value = item.T;
+  document.getElementById("TUnit").value = item.TUnit;
+  MSlider.value = item.M; document.getElementById("MValue").innerText = item.M;
+  ESlider.value = item.E; document.getElementById("EValue").innerText = item.E;
+  PSlider.value = item.P; document.getElementById("PValue").innerText = item.P;
+  document.getElementById("V").value = item.V;
+  document.getElementById("Allowance").value = item.Allowance;
+  document.getElementById("Cost").value = item.C;
+  document.getElementById("kValue").value = item.k;
+  document.getElementById("memo").value = item.memo;
+
+  document.getElementById("HResult").innerText = item.H.toFixed(2);
+  document.getElementById("QResult").innerText = parseFloat(item.Q.toFixed(2));
+  const judgementElem = document.getElementById("QJudgement");
+  judgementElem.innerText = item.judgement;
+  judgementElem.style.color = item.judgement === "良い" ? "lightgreen" : item.judgement === "均衡" ? "white" : "red";
+
+  let Tmonth = parseFloat(item.T);
+  if(item.TUnit === "day") Tmonth = Tmonth/30;
+  else if(item.TUnit === "week") Tmonth = Tmonth/4.345;
+  else if(item.TUnit === "year") Tmonth = Tmonth*12;
+
+  drawGraph(item.M, item.E, item.P, item.V, Tmonth);
+}
+
+function exportCSV() {
+  let history = JSON.parse(localStorage.getItem("happinessHistory")||"[]");
+  let csv = "日付,メモ,T,TUnit,M,E,P,V,Allowance,C,k,H,Q,判定\n";
+  history.forEach(item=>{
+    csv += `"${item.date}","${item.memo}",${item.T},${item.TUnit},${item.M},${item.E},${item.P},${item.V},${item.Allowance},${item.C},${item.k},${item.H},${item.Q},${item.judgement}\n`;
+  });
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "happiness_history.csv";
+  a.click();
+}
+
+loadHistory();
+</script>
+</body>
+</html>
