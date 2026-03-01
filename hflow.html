@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="ja" style="background:#100f0c;color:#f2ede5;">
+<head>
+<script>
+  (function() {
+    try {
+      const t = localStorage.getItem('hflow_theme');
+      if (t === 'light') document.documentElement.classList.add('light');
+    } catch(e){}
+    document.documentElement.style.visibility = 'hidden';
+  })();
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>H.Flow - 幸福観察ツール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600&family=Nunito:wght@400;600;700;800&display=block" rel="stylesheet">
+<style>
+/* ===== FOUC防止: テーマ背景の即時反映 ===== */
+html       { background-color: #100f0c; color: #f2ede5; }
+html.light { background-color: #f7f5f1; color: #292520; }
+
+/* ===== H.Flow テーマ変数 (dark) ===== */
+:root {
+  --bg:       #100f0c;
+  --bg2:      #1a1814;
+  --card:     #25221d;
+  --border:   rgba(255,255,255,0.12);
+  --text:     #f2ede5;
+  --muted:    #a89d8b;
+  --accent:   #c8a96e;
+  --accent2:  #e0c58e;
+  --ant:      #6caee0;
+  --exp:      #7cc57a;
+  --rec:      #e4c85a;
+  --ant-dim:  rgba(106,171,220,0.18);
+  --exp-dim:  rgba(123,200,122,0.18);
+  --rec-dim:  rgba(232,200,85,0.18);
+  --bad:      #e07070;
+  --shadow:   0 4px 24px rgba(0,0,0,0.55);
+  --radius:   14px;
+  --font-head:'Lora', Georgia, serif;
+  --font-body:'Nunito','Yu Gothic UI',Meiryo,sans-serif;
+}
+
+/* ===== テーマ変数 (light) ===== */
+:root.light {
+  --bg:       #f7f5f1;
+  --bg2:      #eeebe6;
+  --card:     #ffffff;
+  --border:   rgba(0,0,0,0.15);
+  --text:     #292520;
+  --muted:    #5e5549;
+  --accent:   #a07025;
+  --accent2:  #c4963a;
+  --ant:      #2f82c2;
+  --exp:      #319c31;
+  --rec:      #b88c15;
+  --ant-dim:  rgba(42,128,190,0.20);
+  --exp-dim:  rgba(46,158,46,0.20);
+  --rec-dim:  rgba(184,144,16,0.20);
+  --bad:      #c03030;
+  --shadow:   0 4px 20px rgba(0,0,0,0.12);
+}
+
+.subtitle,
+.formula-bar,
+.var-desc,
+.h-note,
+.tendency-box { opacity: 0.9; }
+
+:root.light input[type=range] { background: rgba(0,0,0,0.12); }
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); min-height: 100vh; }
+body { padding: 16px 16px 56px; opacity: 0; transition: opacity 0.35s ease; }
+body.ready { opacity: 1; }
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 10%, rgba(200,169,110,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(106,171,220,0.05) 0%, transparent 60%);
+  pointer-events: none; z-index: 0;
+}
+body > * { position: relative; z-index: 1; }
+
+:root { transition: background-color 0.35s ease, color 0.35s ease; }
+
+.wrap { max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+/* ヘッダー */
+header { padding: 8px 0 2px; }
+.title-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+h1 {
+  font-family: var(--font-head);
+  font-size: 1.75rem; font-weight: 600; margin: 0; letter-spacing: -0.02em;
+  background: linear-gradient(120deg, var(--accent2) 0%, var(--text) 70%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.subtitle { font-size: 0.82rem; color: var(--muted); font-style: italic; font-family: var(--font-head); }
+.formula-bar { margin-top: 5px; font-size: 0.80rem; color: var(--muted); letter-spacing: 0.01em; }
+
+/* カード */
+.card {
+  background: var(--card); border-radius: var(--radius);
+  padding: 18px; display: flex; flex-direction: column; gap: 14px;
+  box-shadow: var(--shadow); border: 1px solid var(--border);
+  animation: fadeUp 0.4s ease both; will-change: opacity, transform;
+}
+.card:nth-of-type(1){animation-delay:0.00s}
+.card:nth-of-type(2){animation-delay:0.07s}
+.card:nth-of-type(3){animation-delay:0.14s}
+
+/* テーマトグル */
+.theme-toggle {
+  position: fixed; top: 14px; right: 16px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 6px 11px; font-size: 1rem;
+  cursor: pointer; color: var(--text); box-shadow: var(--shadow); z-index: 100;
+  transition: background 0.3s;
+}
+
+/* 変数ラベル */
+.var-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+.var-name { font-size: 0.88rem; color: var(--muted); font-weight: 700; letter-spacing: 0.05em; }
+.var-desc { font-size: 0.80rem; color: var(--muted); font-style: italic; font-family: var(--font-head); margin-left: 8px; }
+.var-val { font-size: 1.0rem; font-weight: 800; color: var(--accent2); min-width: 40px; text-align: right; }
+
+/* 入力 */
+input[type=number], select {
+  padding: 9px 12px; border-radius: 9px; border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04); color: var(--text);
+  font-family: var(--font-body); font-size: 1rem; width: 100%; transition: border-color 0.2s;
+}
+:root.light input[type=number], :root.light select { background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.1); }
+input[type=number]:focus, select:focus { outline: none; border-color: var(--accent); }
+.flex-row { display: flex; gap: 8px; align-items: center; }
+
+/* スライダー */
+.slider-wrap { display: flex; flex-direction: column; gap: 5px; transition: opacity 0.3s; }
+.slider-wrap.locked { opacity: 0.38; pointer-events: none; }
+input[type=range] {
+  -webkit-appearance: none; appearance: none; width: 100%;
+  height: 5px; border-radius: 3px; background: var(--border); outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  cursor: pointer; transition: transform 0.15s;
+}
+input[type=range]::-webkit-slider-thumb:active { transform: scale(1.25); }
+input[type=range].exp-r::-webkit-slider-thumb { background: var(--exp); }
+input[type=range].rec-r::-webkit-slider-thumb { background: var(--rec); }
+.scale-hint { display: flex; justify-content: space-between; font-size: 0.70rem; color: var(--muted); }
+
+/* 編集トグル */
+.edit-row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.edit-lbl { font-size: 0.80rem; color: var(--muted); }
+.sw { position: relative; width: 42px; height: 24px; cursor: pointer; }
+.sw input { opacity: 0; width: 0; height: 0; }
+.sw-track { position: absolute; inset: 0; background: var(--border); border-radius: 12px; transition: background 0.3s; }
+.sw input:checked + .sw-track { background: var(--accent); }
+.sw-thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 0.3s; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+.sw input:checked ~ .sw-thumb { transform: translateX(18px); }
+
+/* H表示 */
+.h-display {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 10px 14px; border-radius: 10px;
+  background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+}
+.h-label { font-size: 0.80rem; color: var(--muted); font-weight: 700; letter-spacing: 0.06em; }
+.h-value { font-size: 1.3rem; font-weight: 800; color: var(--accent2); font-family: var(--font-head); }
+.h-note { font-size: 0.75rem; color: var(--muted); margin-left: auto; font-style: italic; font-family: var(--font-head); }
+
+/* 棒グラフ */
+.chart-title { font-family: var(--font-head); font-size: 0.95rem; font-weight: 600; }
+.chart-area { display: flex; gap: 10px; align-items: flex-end; height: 190px; padding: 0 4px; }
+.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 7px; }
+.bar-outer {
+  width: 100%; height: 100%; border-radius: 10px 10px 4px 4px;
+  position: relative; overflow: hidden;
+}
+.bar-outer.ant { background: var(--ant-dim); }
+.bar-outer.exp { background: var(--exp-dim); }
+.bar-outer.rec { background: var(--rec-dim); }
+.bar-fill {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  border-radius: 10px 10px 4px 4px;
+  transition: height 0.65s cubic-bezier(0.34,1.4,0.64,1);
+}
+.bar-fill.ant { background: linear-gradient(180deg, rgba(140,200,240,0.9), var(--ant)); }
+.bar-fill.exp { background: linear-gradient(180deg, rgba(160,220,160,0.9), var(--exp)); }
+.bar-fill.rec { background: linear-gradient(180deg, rgba(240,220,120,0.9), var(--rec)); }
+.bar-num {
+  position: absolute; top: 7px; left: 0; right: 0;
+  text-align: center; font-size: 0.78rem; font-weight: 800; color: var(--text); opacity: 0.9;
+}
+.bar-tag { font-size: 0.78rem; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.bar-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 3px; vertical-align: middle; }
+
+/* 構成比 */
+.ratio-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.ratio-pill { flex: 1; text-align: center; padding: 6px 8px; border-radius: 8px; font-size: 0.80rem; font-weight: 700; }
+.ratio-pill.ant { background: var(--ant-dim); color: var(--ant); }
+.ratio-pill.exp { background: var(--exp-dim); color: var(--exp); }
+.ratio-pill.rec { background: var(--rec-dim); color: var(--rec); }
+
+/* 傾向ボックス */
+.tendency-box {
+  padding: 11px 14px; border-radius: 10px;
+  background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+  font-size: 0.84rem; color: var(--muted); line-height: 1.65;
+  font-style: italic; font-family: var(--font-head); min-height: 50px;
+  transition: color 0.4s;
+}
+:root.light .tendency-box { background: rgba(0,0,0,0.02); }
+
+/* ボタン */
+button {
+  border: 0; border-radius: 10px; padding: 10px 14px;
+  font-family: var(--font-body); font-weight: 700; cursor: pointer;
+  transition: all 0.22s; font-size: 0.9rem;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  color: #13120f; letter-spacing: 0.02em;
+}
+.btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-small { padding: 7px 11px; border-radius: 8px; font-size: 0.82rem; }
+.btn-danger { background: var(--bad); color: #fff; padding: 7px 10px; border-radius: 8px; font-size: 0.80rem; }
+
+/* 履歴 */
+.history-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow: auto; }
+.hist-item {
+  display: flex; flex-direction: column; padding: 10px 12px;
+  border-radius: 10px; background: rgba(255,255,255,0.015);
+  border: 1px solid var(--border); transition: border-color 0.2s;
+}
+.hist-item:hover { border-color: rgba(200,169,110,0.3); }
+.hist-top { display: flex; justify-content: space-between; align-items: center; }
+.hist-meta { font-size: 0.78rem; color: var(--muted); }
+.hist-memo { font-weight: 800; margin-top: 4px; font-size: 0.88rem; }
+.hist-bars { display: flex; gap: 3px; margin-top: 6px; height: 4px; border-radius: 2px; overflow: hidden; }
+.mini-seg { height: 100%; transition: flex 0.4s; }
+.hist-h { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+
+/* トースト */
+.toast {
+  position: fixed; top: 20px; left: 50%; transform: translate(-50%, -30px);
+  background: var(--card); border: 1px solid var(--accent); color: var(--text);
+  padding: 9px 18px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  opacity: 0; transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.25,1,0.5,1);
+  z-index: 99999; pointer-events: none; font-size: 0.86rem; font-weight: 600;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.hide  { opacity: 0; transform: translate(-50%, -30px); }
+
+.input-error { border: 2px solid var(--bad) !important; animation: shake 0.3s ease-in-out; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+
+.sort-active { background: var(--accent) !important; color: #13120f !important; border: none !important; }
+
+footer { font-size: 0.76rem; color: var(--muted); text-align: center; margin-top: 8px; font-style: italic; font-family: var(--font-head); }
+
+.history-list::-webkit-scrollbar { width: 4px; }
+.history-list::-webkit-scrollbar-track { background: transparent; }
+.history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+hr.div { border: none; border-top: 1px solid var(--border); margin: 2px 0; }
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle">🌙</button>
+
+<div class="wrap">
+  <header>
+    <div class="title-row">
+      <h1>H.Flow</h1>
+      <span class="subtitle">幸福観察ツール</span>
+    </div>
+    <div class="formula-bar">H = M × [ln(1+T) + E] + P×V</div>
+  </header>
+
+  <!-- 入力カード -->
+  <section class="card">
+    <div class="edit-row">
+      <span class="edit-lbl" id="editLbl">編集モード</span>
+      <label class="sw">
+        <input type="checkbox" id="editToggle">
+        <span class="sw-track"></span>
+        <span class="sw-thumb"></span>
+      </label>
+    </div>
+
+    <!-- T -->
+    <div>
+      <div class="var-label">
+        <div><span class="var-name">T</span><span class="var-desc">待っている期間</span></div>
+        <span class="var-val" id="Tval">0日</span>
+      </div>
+      <div class="flex-row">
+        <input id="T" type="number" min="0" step="1" placeholder="例: 0" style="flex:2;">
+        <select id="Tunit" style="flex:1;">
+          <option value="day">日</option>
+          <option value="week">週</option>
+          <option value="month">月</option>
+          <option value="year">年</option>
+        </select>
+      </div>
+    </div>
+
+    <hr class="div">
+
+    <!-- M -->
+    <div>
+      <div class="var-label">
+        <div><span class="var-name">M</span><span class="var-desc">動機の質</span></div>
+        <span class="var-val" id="Mval">1.0</span>
+      </div>
+      <div class="slider-wrap" id="Mwrap">
+        <input type="range" id="M" min="0.1" max="2.0" step="0.1" value="1.0">
+        <div class="scale-hint"><span>0.1 外発的</span><span>1.0 中間</span><span>2.0 内発的</span></div>
+      </div>
+    </div>
+
+    <!-- E -->
+    <div>
+      <div class="var-label">
+        <div><span class="var-name">E</span><span class="var-desc">平均的な幸福感</span></div>
+        <span class="var-val" id="Eval">5</span>
+      </div>
+      <div class="slider-wrap" id="Ewrap">
+        <input type="range" id="E" min="1" max="10" step="1" value="5" class="exp-r">
+        <div class="scale-hint"><span>1 低い</span><span style="color:var(--exp)">5</span><span>10 高い</span></div>
+      </div>
+    </div>
+
+    <!-- P -->
+    <div>
+      <div class="var-label">
+        <div><span class="var-name">P</span><span class="var-desc">ピークの幸福感</span></div>
+        <span class="var-val" id="Pval">5</span>
+      </div>
+      <div class="slider-wrap" id="Pwrap">
+        <input type="range" id="P" min="1" max="10" step="1" value="5" class="rec-r">
+        <div class="scale-hint"><span>1 低い</span><span style="color:var(--rec)">5</span><span>10 高い</span></div>
+      </div>
+    </div>
+
+    <!-- V -->
+    <div>
+      <div class="var-label">
+        <div><span class="var-name">V</span><span class="var-desc">価値観合致度</span></div>
+        <span class="var-val" id="Vval">0.5</span>
+      </div>
+      <div class="slider-wrap" id="Vwrap">
+        <input type="range" id="V" min="0.1" max="1.0" step="0.1" value="0.5" class="rec-r">
+        <div class="scale-hint"><span>0.1 低い</span><span style="color:var(--rec)">0.5</span><span>1.0 高い</span></div>
+      </div>
+    </div>
+
+    <div class="flex-row" style="flex-wrap:wrap; gap:8px; margin-top:2px;">
+      <button id="calcBtn" class="btn-primary">観察する</button>
+      <button id="saveBtn" class="btn-ghost btn-small">履歴保存</button>
+      <button id="exportBtn" class="btn-ghost btn-small">CSV出力</button>
+    </div>
+  </section>
+
+  <!-- 結果カード -->
+  <section class="card">
+    <div class="h-display">
+      <span class="h-label">H</span>
+      <span class="h-value" id="Hout">—</span>
+      <span class="h-note">総幸福量</span>
+    </div>
+
+    <div class="chart-title">幸福の三成分</div>
+    <div class="chart-area">
+      <div class="bar-col">
+        <div class="bar-outer ant">
+          <div class="bar-fill ant" id="barAnt" style="height:0%">
+            <div class="bar-num" id="numAnt">—</div>
+          </div>
+        </div>
+        <div class="bar-tag"><span class="bar-dot" style="background:var(--ant)"></span>予期</div>
+      </div>
+      <div class="bar-col">
+        <div class="bar-outer exp">
+          <div class="bar-fill exp" id="barExp" style="height:0%">
+            <div class="bar-num" id="numExp">—</div>
+          </div>
+        </div>
+        <div class="bar-tag"><span class="bar-dot" style="background:var(--exp)"></span>経験</div>
+      </div>
+      <div class="bar-col">
+        <div class="bar-outer rec">
+          <div class="bar-fill rec" id="barRec" style="height:0%">
+            <div class="bar-num" id="numRec">—</div>
+          </div>
+        </div>
+        <div class="bar-tag"><span class="bar-dot" style="background:var(--rec)"></span>想起</div>
+      </div>
+    </div>
+
+    <div class="ratio-row">
+      <div class="ratio-pill ant" id="ratioAnt">予期 —%</div>
+      <div class="ratio-pill exp" id="ratioExp">経験 —%</div>
+      <div class="ratio-pill rec" id="ratioRec">想起 —%</div>
+    </div>
+
+    <div class="tendency-box" id="tendencyBox">「観察する」を押すと、幸福の傾向が表示されます。</div>
+  </section>
+
+  <!-- 履歴カード -->
+  <section class="card">
+    <div class="flex-row" style="flex-wrap:wrap; gap:6px;">
+      <button id="sortHBtn" class="btn-ghost btn-small">H 高い順</button>
+      <button id="sortTimeBtn" class="btn-ghost btn-small">時系列</button>
+      <div style="flex:1;"></div>
+      <button id="clearAllBtn" class="btn-ghost btn-small">全件削除</button>
+    </div>
+    <div class="history-list" id="historyList"></div>
+  </section>
+
+  <footer>Happiness Flow Model</footer>
+</div>
+
+<script>
+const SK  = 'hflow_history_v1';
+const TK  = 'hflow_theme';
+const SMK = 'hflow_sort_mode';
+const EPS = 1e-9;
+const rnd = (v, dp=4) => { const m=10**dp; return Math.round(v*m)/m; };
+const qs  = s => document.querySelector(s);
+const toN = v => { const n=Number(v); return isFinite(n)?n:NaN; };
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(SK) || '[]'); }
+  catch { return []; }
+}
+
+function convertT(val, unit) {
+  if (!isFinite(val) || val < 0) return NaN;
+  return unit==='week'?val*7:unit==='month'?val*30:unit==='year'?val*365:val;
+}
+
+function compute({M, T, E, P, V}) {
+  const ant = M * Math.log(1 + T);
+  const exp_ = M * E;
+  const rec  = P * V;
+  return { H: rnd(ant+exp_+rec,4), ant: rnd(ant,4), exp: rnd(exp_,4), rec: rnd(rec,4) };
+}
+
+function showToast(msg) {
+  document.querySelectorAll('.toast').forEach(el => el.remove());
+  const t = document.createElement('div');
+  t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.classList.add('show'), 50);
+  setTimeout(()=>{
+    t.classList.remove('show'); t.classList.add('hide');
+    setTimeout(()=>t.remove(), 500);
+  }, 2800);
+}
+
+function shakeEl(el) {
+  el.classList.remove('input-error'); void el.offsetWidth;
+  el.classList.add('input-error'); setTimeout(()=>el.classList.remove('input-error'), 3000);
+}
+
+// DOM refs
+const Tinput   = qs('#T'),   TunitSel = qs('#Tunit');
+const Minput   = qs('#M'),   Einput   = qs('#E');
+const Pinput   = qs('#P'),   Vinput   = qs('#V');
+const Tval     = qs('#Tval'),  Mval = qs('#Mval'), Eval = qs('#Eval'), Pval = qs('#Pval'), Vval = qs('#Vval');
+const calcBtn  = qs('#calcBtn'), saveBtn = qs('#saveBtn'), exportBtn = qs('#exportBtn');
+const clearAllBtn = qs('#clearAllBtn'), historyList = qs('#historyList');
+const editToggle  = qs('#editToggle'),  editLbl     = qs('#editLbl'), themeToggle = qs('#themeToggle');
+const sortHBtn    = qs('#sortHBtn'),    sortTimeBtn = qs('#sortTimeBtn');
+const Hout   = qs('#Hout');
+const barAnt = qs('#barAnt'), barExp = qs('#barExp'), barRec = qs('#barRec');
+const numAnt = qs('#numAnt'), numExp = qs('#numExp'), numRec = qs('#numRec');
+const ratioAnt = qs('#ratioAnt'), ratioExp = qs('#ratioExp'), ratioRec = qs('#ratioRec');
+const tendencyBox = qs('#tendencyBox');
+
+let lastResult = null;
+
+// スライダー表示更新
+Minput.oninput = () => Mval.textContent = Number(Minput.value).toFixed(1);
+Einput.oninput = () => Eval.textContent = Einput.value;
+Pinput.oninput = () => Pval.textContent = Pinput.value;
+Vinput.oninput = () => Vval.textContent = Number(Vinput.value).toFixed(1);
+Tinput.oninput = () => {
+  const v = Tinput.value === '' ? 0 : toN(Tinput.value);
+  const d = convertT(v, TunitSel.value);
+  Tval.textContent = (isFinite(d) && d >= 0) ? `${rnd(d,1)}日` : '—';
+};
+TunitSel.onchange = () => Tinput.dispatchEvent(new Event('input'));
+
+// 編集モード
+const sliderWraps = ['Mwrap','Ewrap','Pwrap','Vwrap'].map(id=>qs('#'+id));
+function applyEdit(on) {
+  sliderWraps.forEach(w => on ? w.classList.remove('locked') : w.classList.add('locked'));
+  editLbl.textContent = on ? '編集モード' : '編集モード (OFF)';
+}
+editToggle.onchange = () => applyEdit(editToggle.checked);
+applyEdit(false);
+
+// 傾向コメント
+function getTendency(ant, exp, rec, H) {
+  if (H < EPS) return '「観察する」を押すと、幸福の傾向が表示されます。';
+  const total = ant + exp + rec;
+  const sorted = [['ant',ant/total],['exp',exp/total],['rec',rec/total]].sort((a,b)=>b[1]-a[1]);
+  const domMsg = {
+    ant: 'あなたの幸福は「予期・期待」に色づいています。待つ時間そのものも幸せの一部だったりします。',
+    exp: 'あなたの幸福は「経験・体験」が中心です。生きているあいだにしか味わえない、「今ここ」の感覚そのものです。',
+    rec: 'あなたの幸福は「想起・記憶」に宿っています。体験が価値観と結びつき、長く心に残っているようです。',
+  }[sorted[0][0]];
+  const spread = sorted[0][1] - sorted[2][1];
+  const balanceMsg = spread < 0.2
+    ? ' 三つの成分がバランスよく分布した穏やかな幸福像です。'
+    : spread > 0.55
+      ? ' 突出した成分があり、ユニークな幸福のパターンを持っています。'
+      : '';
+  return domMsg + balanceMsg;
+}
+
+// グラフ更新
+function updateChart({ H, ant, exp, rec }) {
+  Hout.textContent = isFinite(H) ? H.toFixed(3) : '—';
+  const maxV = Math.max(ant, exp, rec, EPS);
+  const pct = v => Math.round((v/maxV)*86);
+  barAnt.style.height = pct(ant)+'%'; numAnt.textContent = ant.toFixed(2);
+  barExp.style.height = pct(exp)+'%'; numExp.textContent = exp.toFixed(2);
+  barRec.style.height = pct(rec)+'%'; numRec.textContent = rec.toFixed(2);
+  const total = ant + exp + rec;
+  if (total > EPS) {
+    ratioAnt.textContent = `予期 ${Math.round(ant/total*100)}%`;
+    ratioExp.textContent = `経験 ${Math.round(exp/total*100)}%`;
+    ratioRec.textContent = `想起 ${Math.round(rec/total*100)}%`;
+  }
+  tendencyBox.textContent = getTendency(ant, exp, rec, H);
+}
+
+// 計算ボタン
+calcBtn.onclick = () => {
+  if (Tinput.value.trim() === '') {
+    showToast('T を入力してください');
+    shakeEl(Tinput);
+    Tinput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  const Tdays = convertT(toN(Tinput.value), TunitSel.value);
+  const M = toN(Minput.value), E = toN(Einput.value);
+  const P = toN(Pinput.value), V = toN(Vinput.value);
+  if (!isFinite(Tdays)||Tdays<0) { showToast('T に有効な値を入力してください'); shakeEl(Tinput); return; }
+  if (!isFinite(M)||!isFinite(E)||!isFinite(P)||!isFinite(V)) { showToast('スライダーの値が不正です'); return; }
+  const res = compute({ M, T:Tdays, E, P, V });
+  lastResult = { M, T:Tdays, Tunit:TunitSel.value, E, P, V, ...res };
+  updateChart(res);
+};
+
+// 保存
+saveBtn.onclick = () => {
+  if (!lastResult) { showToast('先に「観察する」を押してください'); return; }
+  const memo = prompt('メモを入力（例: 旅行の前日）');
+  if (memo === null) return;
+  const entry = { id:'h'+Date.now(), ts:new Date().toISOString(), memo:memo.trim(), ...lastResult };
+  const arr = loadHistory();
+  arr.unshift(entry); localStorage.setItem(SK, JSON.stringify(arr));
+  renderHistory(); showToast('💾 保存しました');
+};
+
+// CSV出力
+exportBtn.onclick = () => {
+  const arr = loadHistory();
+  if (!arr.length) { showToast('履歴がありません'); return; }
+  if (!confirm('履歴をCSVとして出力しますか？')) return;
+  const rows = [['ts','M','T(日換算)','E','P','V','H','予期','経験','想起','memo']];
+  arr.forEach(e => rows.push([e.ts,e.M,e.T,e.E,e.P,e.V,e.H,e.ant,e.exp,e.rec,e.memo]));
+  const csv = new Blob([rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n')],{type:'text/csv'});
+  const url = URL.createObjectURL(csv);
+  const a = document.createElement('a');
+  a.href=url; a.download='hflow_history.csv';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+};
+
+// 全件削除
+clearAllBtn.onclick = () => {
+  if (confirm('履歴を全て削除しますか？')) { localStorage.removeItem(SK); renderHistory(); }
+};
+
+// 履歴描画
+function renderHistory() {
+  const arr = loadHistory();
+  if (!arr.length) {
+    historyList.innerHTML='<div style="color:var(--muted);font-size:0.83rem;padding:2px 0;">まだ観察記録がありません</div>';
+    return;
+  }
+  historyList.innerHTML = '';
+  arr.forEach(item => {
+    const total = (item.ant||0)+(item.exp||0)+(item.rec||0);
+    const pa = total>EPS ? Math.round((item.ant||0)/total*100) : 0;
+    const pe = total>EPS ? Math.round((item.exp||0)/total*100) : 0;
+    const pr = 100-pa-pe;
+
+    const el   = document.createElement('div'); el.className='hist-item';
+    const top  = document.createElement('div'); top.className='hist-top';
+    const meta = document.createElement('div'); meta.className='hist-meta';
+    meta.textContent = new Date(item.ts).toLocaleString('ja-JP');
+
+    const acts    = document.createElement('div'); acts.style.cssText='display:flex;gap:6px;';
+    const loadBtn = document.createElement('button');
+    loadBtn.className='btn-ghost btn-small'; loadBtn.textContent='読込';
+    loadBtn.dataset.action='load'; loadBtn.dataset.id=item.id;
+    const delBtn  = document.createElement('button');
+    delBtn.className='btn-danger'; delBtn.textContent='削除';
+    delBtn.dataset.action='del'; delBtn.dataset.id=item.id;
+    acts.append(loadBtn, delBtn);
+    top.append(meta, acts);
+
+    const memo = document.createElement('div'); memo.className='hist-memo';
+    memo.textContent = item.memo||'';
+
+    const bars = document.createElement('div'); bars.className='hist-bars';
+    bars.innerHTML=`
+      <div class="mini-seg" style="background:var(--ant);flex:${pa}"></div>
+      <div class="mini-seg" style="background:var(--exp);flex:${pe}"></div>
+      <div class="mini-seg" style="background:var(--rec);flex:${pr}"></div>
+    `;
+
+    const hl = document.createElement('div'); hl.className='hist-h';
+    hl.textContent = `H=${(item.H||0).toFixed(3)}  予${pa}% 経${pe}% 想${pr}%`;
+
+    el.append(top, memo, bars, hl);
+    historyList.appendChild(el);
+  });
+}
+
+// イベント委譲 (履歴: 読込・削除)
+historyList.addEventListener('click', ev => {
+  const btn = ev.target.closest('button'); if (!btn) return;
+  const { action, id } = btn.dataset;
+  const arr = loadHistory();
+  if (action === 'load') {
+    const item = arr.find(x=>x.id===id); if (!item) return;
+    const unit = item.Tunit || 'day';
+    const tVal = unit==='week'?rnd(item.T/7,2):unit==='month'?rnd(item.T/30,2):unit==='year'?rnd(item.T/365,2):item.T;
+    Tinput.value=tVal; TunitSel.value=unit;
+    Minput.value=item.M; Mval.textContent=Number(item.M).toFixed(1);
+    Einput.value=item.E; Eval.textContent=item.E;
+    Pinput.value=item.P; Pval.textContent=item.P;
+    Vinput.value=item.V; Vval.textContent=Number(item.V).toFixed(1);
+    Tinput.dispatchEvent(new Event('input'));
+    lastResult = {...item};
+    updateChart({ H:item.H, ant:item.ant, exp:item.exp, rec:item.rec });
+    window.scrollTo({ top:0, behavior:'smooth' });
+  } else if (action === 'del') {
+    if (!confirm('削除しますか？')) return;
+    localStorage.setItem(SK, JSON.stringify(arr.filter(x=>x.id!==id)));
+    renderHistory();
+  }
+});
+
+// ソート
+function setSortMode(mode) {
+  const arr = loadHistory();
+  if (mode==='H') arr.sort((a,b)=>(b.H||0)-(a.H||0));
+  else            arr.sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  localStorage.setItem(SK, JSON.stringify(arr));
+  localStorage.setItem(SMK, mode);
+  renderHistory();
+  sortHBtn.classList.toggle('sort-active',    mode==='H');
+  sortTimeBtn.classList.toggle('sort-active', mode!=='H');
+}
+sortHBtn.onclick    = () => setSortMode('H');
+sortTimeBtn.onclick = () => setSortMode('time');
+setSortMode(localStorage.getItem(SMK)==='H' ? 'H' : 'time');
+
+// テーマ
+function applyTheme(mode) {
+  document.documentElement.classList.toggle('light', mode==='light');
+  themeToggle.textContent = mode==='light' ? '🌙' : '☀️';
+  localStorage.setItem(TK, mode);
+}
+themeToggle.onclick = () => {
+  applyTheme(document.documentElement.classList.contains('light') ? 'dark' : 'light');
+};
+(function(){
+  const s = localStorage.getItem(TK);
+  applyTheme(s || (window.matchMedia('(prefers-color-scheme:light)').matches ? 'light' : 'dark'));
+})();
+
+// フェードイン
+document.addEventListener('DOMContentLoaded', () => {
+  requestAnimationFrame(() => {
+    document.documentElement.style.visibility = 'visible';
+    document.body.classList.add('ready');
+  });
+});
+</script>
+</body>
+</html>
